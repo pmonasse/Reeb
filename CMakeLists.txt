@@ -24,7 +24,6 @@ if(NOT PNG_FOUND)
   add_library(PNG::PNG ALIAS "${PNG_LIBRARIES}")
 endif()
 
-# MULTISCALE LSD
 add_executable(pmbil
   io_png.c io_png.h
   cmdLine.h
