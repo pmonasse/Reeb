@@ -25,10 +25,14 @@ if(NOT PNG_FOUND)
 endif()
 
 add_executable(pmbil
-  io_png.c io_png.h
-  cmdLine.h
-  main.cpp
-  persistence.cpp persistence.h)
+    io_png.c io_png.h
+    cmdLine.h
+    draw_curve.cpp draw_curve.h
+    fill_curve.cpp fill_curve.h
+    levelLine.cpp levelLine.h
+    lltree.cpp lltree.h
+    bilines.cpp
+    persistence.cpp persistence.h)
 
 target_link_libraries(pmbil PRIVATE PNG::PNG)
 
