@@ -1,0 +1,6 @@
+bash
+git
+g++
+make
+cmake
+libpng-dev
