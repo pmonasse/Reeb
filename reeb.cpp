@@ -21,6 +21,14 @@ struct color_t {
     :r(r0),g(g0),b(b0) {}
 };
 
+struct TransformZoom : public TransformPoint {
+    int z;
+    TransformZoom(int zoom=1): z(zoom) {}
+    Point operator()(const Point& p) const {
+        return Point(z*p.x, z*p.y);
+    }
+};
+
 const color_t WHITE(255,255,255);
 const color_t GREEN(0,255,0);
 
@@ -66,13 +74,18 @@ static unsigned char fill_border(unsigned char* im, size_t w, size_t h) {
 
 /// Main procedure for curvature microscope.
 int main(int argc, char** argv) {
+    int z=1;
     CmdLine cmd; cmd.prefixDoc = "\t";
-    //    cmd.add( make_option('q',qstep).doc("Quantization step (integer)") );
+    cmd.add( make_option('z',z,"zoom").doc("Zoom factor (integer)") );
     cmd.process(argc, argv);
     if(argc!=3) {
         std::cerr << "Usage: " << argv[0]
                   << " [options] in.png out.png" << std::endl;
         std::cerr << "Option:\n" << cmd;
+        return 1;
+    }
+    if(z<1) {
+        std::cerr << "The zoom factor must be strictly positive" << std::endl;
         return 1;
     }
 
@@ -85,17 +98,24 @@ int main(int argc, char** argv) {
     fill_border(in, w, h); // Background gray of output
 
     // Extract level lines
-    LLTree tree(in, (int)w, (int)h, 0);
+    LLTree tree(in, (int)w, (int)h, z-1);
     free(in);
     std::cout << tree.nodes().size() << " level lines." << std::endl;
 
     // Draw level lines
+    TransformZoom t(z);
+    w *= z;
+    h *= z;
     color_t* out = new color_t[w*h];
-    for(LLTree::iterator it=tree.begin(); it!=tree.end(); ++it)
-        draw_curve(it->ll->line,GREEN, out+0*w*h,(int)w,(int)h);
+    const color_t palette[4] = {color_t(0,0,0),   color_t(0,0,255),
+                                color_t(0,255,0), color_t(255,0,0)};
+    for(LLTree::iterator it=tree.begin(); it!=tree.end(); ++it) {
+        color_t color = palette[it->ll->type];
+        draw_curve(it->ll->line,color, out,(int)w,(int)h, t);
+    }
 
     // Output image
-    if(io_png_write_u8(argv[2], (unsigned char*)out, (int)w, (int)h, 3)!=0) {
+    if(io_png_write_u8(argv[2], (unsigned char*)out, (int)w, (int)h, 3)!=0){
         std::cerr << "Error writing image file " << argv[2] << std::endl;
         return 1;
     }

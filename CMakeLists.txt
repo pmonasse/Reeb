@@ -24,18 +24,17 @@ if(NOT PNG_FOUND)
   add_library(PNG::PNG ALIAS "${PNG_LIBRARIES}")
 endif()
 
-add_executable(pmbil
+add_executable(reeb
     io_png.c io_png.h
     cmdLine.h
     draw_curve.cpp draw_curve.h
     fill_curve.cpp fill_curve.h
     levelLine.cpp levelLine.h
     lltree.cpp lltree.h
-    bilines.cpp
-    persistence.cpp persistence.h)
+    reeb.cpp)
 
-target_link_libraries(pmbil PRIVATE PNG::PNG)
+target_link_libraries(reeb PRIVATE PNG::PNG)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU)|(CLANG)")
-  set_target_properties(pmbil PROPERTIES COMPILE_FLAGS "-Wall -Wextra")
+  set_target_properties(reeb PROPERTIES COMPILE_FLAGS "-Wall -Wextra")
 endif()

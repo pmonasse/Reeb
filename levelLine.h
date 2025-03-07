@@ -40,7 +40,9 @@ void zoom_line(std::vector<Point>& line, float zoom);
 struct LevelLine {
     float level;
     std::vector<Point> line;
-    LevelLine(float l): level(l) {}
+    enum Type { REGULAR=0, MIN, SADDLE, MAX };
+    Type type;
+    LevelLine(float l, Type t=REGULAR): level(l), type(t) {}
     void fill(unsigned char* data, size_t w, size_t h,
               std::vector< std::vector<float> >* inter=0) const;
 };

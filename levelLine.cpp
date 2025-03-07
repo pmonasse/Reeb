@@ -3,12 +3,28 @@
  * @file levelLine.cpp
  * @brief Extraction of level lines from an image
  * 
- * (C) 2011-2016, 2019 Pascal Monasse <pascal.monasse@enpc.fr>
+ * (C) 2011-2016, 2019, 2024-2025 Pascal Monasse <pascal.monasse@enpc.fr>
  */
 
 #include "levelLine.h"
+#include <stack>
+#include <algorithm>
 #include <cmath>
 #include <cassert>
+
+/// Quantification steps of singular levels. Safe up to width < 2^10 pixels.
+/// 23 bits for epsilon machine: -8 bits for image depth, -10 bits for width.
+const int QLEVEL = 1<<(23-8-10);
+const float DELTA_LEVEL = 1.0f/QLEVEL;
+/// Quantized level of saddles.
+float qlevel(float v) {
+    float intpart; // Integral part
+    float frac = std::modf(v, &intpart); // Fract part, quantified next line
+    int s = (int)std::floor(frac*QLEVEL);
+    s = std::max(2,std::min(QLEVEL-2,s));
+    frac = s*DELTA_LEVEL;
+    return intpart+frac;
+}
 
 /// South, East, North, West: directions of entry/exit in a dual pixel.
 /// Left turn=+1. Right turn=-1. Opposite=+2.
@@ -184,11 +200,10 @@ DualPixel::DualPixel(Point& p, float l, const unsigned char* im, size_t w)
     update_levels();
     if(_level[_d]>l && l>_level[(_d+3)%4]) {
         _d = N;
-        p += linear(_level[(_d+3)%4],l,_level[_d])*delta[1];
-        --_pos.y;
+        --_pos.y; ++p.x;
         update_levels();
-    } else
-        p += linear(_level[_d],l,_level[(_d+3)%4])*delta[1];
+    }
+    p += linear(_level[_d],l,_level[(_d+3)%4])*delta[_d+1];
 }
 
 /// Update levels at vertices.
@@ -271,6 +286,8 @@ bool DualPixel::mark_visit(std::vector<bool>& visit,
     bool cont=true;
     if(_d==S || _d==N) {
         size_t i = (size_t)_pos.y*_w+(size_t)_pos.x;
+        if(_d==N)
+            i += _w;
         cont = !visit[i];
         visit[i] = true;
     }
@@ -303,6 +320,135 @@ static void extract(const unsigned char* data, size_t w,
     }
 }
 
+/// Find regional maximum (or minimum if max=false) containing (x,y) in \a im.
+/// \a vu initially tags pixels that cannot take part, augmented then with
+/// pixels explored during the process.
+static bool find_extremum(const unsigned char* im, size_t w, size_t h,
+                          size_t x, size_t y, bool max,
+                          bool* vu, std::vector<Point>& V) {
+    unsigned char level=im[x+y*w];
+    vu[x+y*w] = true;
+    std::stack<Point> S;
+    S.push( Point((float)x,(float)y) );
+    bool success = true;
+    while(! S.empty()) {
+        Point p = S.top(); S.pop();
+        V.push_back(p);
+        for(int i=0; i<4; i++) {
+            Point q = p+delta[i];
+            size_t idx = (size_t)q.x+(size_t)q.y*w;
+            if(im[idx]==level) {
+                if(q.x==0 || (size_t)q.x+1==w || q.y==0 || (size_t)q.y+1==h)
+                    success = false;
+                else if(! vu[idx]) {
+                    vu[idx] = true;
+                    S.push(q);
+                }
+            } else if(max != (im[idx]<level))
+                success = false;
+        }
+    }
+    return success;
+}
+
+/// Handle extrema of the bilinear image.
+void handle_extrema(const unsigned char* im, size_t w, size_t h,
+                    int ptsPixel,
+                    std::vector<LevelLine*>& ll,
+                    std::vector<bool>& visit,
+                    std::vector< std::vector<Inter> >* inter) {
+    bool* vu = new bool[w*h];
+    std::fill(vu, vu+w*h, false);
+    for(size_t y=1; y+1<h; y++) {
+        size_t idx = y*w+1;
+        for(size_t x=1; x+1<w; x++, idx++) {
+            if(vu[idx] || im[idx] == im[idx+1])
+                continue;
+            unsigned char level=im[idx];
+            bool max = (im[idx+1]<level);
+            std::vector<Point> V;
+            if(! find_extremum(im,w,h, x,y,max, vu, V))
+                continue;
+            float v = (max? level-DELTA_LEVEL: level+DELTA_LEVEL);
+            for(std::vector<Point>::iterator it=V.begin();
+                it!=V.end(); ++it) {
+                size_t idx2 = (size_t)it->x+(size_t)it->y*w;
+                if(im[idx2+1] != level && !visit[idx2]) {
+                    LevelLine::Type t = max? LevelLine::MAX: LevelLine::MIN;
+                    LevelLine* line = new LevelLine(v,t);
+                    extract(im,w, visit, ptsPixel, *it, *line,ll.size(), inter);
+                    ll.push_back(line);
+                }
+            }
+            std::fill(visit.begin(), visit.end(), false);
+        }
+    }
+    delete [] vu;
+}
+
+/// Structure to record all saddle points inside the image.
+struct Saddle {
+    size_t x, y; ///< Top-left corner of sample square
+    float value; ///< Level of saddle
+    Saddle(size_t x0, size_t y0, float v): x(x0), y(y0), value(v) {}
+};
+bool operator<(const Saddle& s1, const Saddle& s2) {
+    return s1.value < s2.value;
+}
+
+/// If saddle in unit square of top-left corner (x,y), return its level.
+static bool level_saddle(const unsigned char* im, size_t w, size_t h,
+                         size_t x, size_t y, float& v) {
+    if(x+1>=w || y+1>=h)
+        return false;
+    size_t idx0=x+w*y;
+    float a=im[idx0], b=im[idx0+1], c=im[idx0+w], d=im[idx0+w+1];
+    float min=a, max=d;
+    if(min>max)
+        std::swap(min,max);
+    int sb = b<min? -1: b>max? 1: 0;
+    int sc = c<min? -1: c>max? 1: 0;
+    if(sb*sc <= 0)
+        return false;
+    v = (a*d-b*c)/(a+d-b-c);
+    return true;
+}
+
+/// Find all saddle points of the bilinear image.
+std::vector<Saddle> find_saddles(const unsigned char* im, size_t w, size_t h) {
+    std::vector<Saddle> S;
+    for(size_t y=0; y<h; y++)
+        for(size_t x=0; x<w; x++) {
+            float v;
+            if(level_saddle(im,w,h, x,y, v))
+                S.push_back( Saddle(x,y,v) );
+        }
+    return S;
+}
+
+/// Handle saddle points.
+void handle_saddles(const unsigned char* im, size_t w, size_t h,
+                    int ptsPixel,
+                    std::vector<LevelLine*>& ll,
+                    std::vector<bool>& visit,
+                    std::vector< std::vector<Inter> >* inter) {
+    std::vector<Saddle> S = find_saddles(im,w,h);
+    std::sort(S.begin(), S.end());
+    for(std::vector<Saddle>::const_iterator it=S.begin(); it!=S.end();) {
+        float v = qlevel(it->value); // Handle together all at same quant. level
+        for(; it!=S.end() && qlevel(it->value)==v; ++it) {
+            for(size_t i=0; i<=1; i++)
+                if(! visit[it->x+(it->y+i)*w]) {
+                    LevelLine* line = new LevelLine(v, LevelLine::SADDLE);
+                    Point p((float)it->x,(float)it->y+i);
+                    extract(im,w, visit, ptsPixel, p, *line, ll.size(), inter);
+                    ll.push_back(line);
+                }
+        }
+        std::fill(visit.begin(), visit.end(), false);
+    }
+}
+
 /// Level lines extraction algorithm.
 /// \param im the values of pixels in a 1D array.
 /// \param w the number of pixel columns in \a data.
@@ -319,23 +465,6 @@ void extract(const unsigned char* im, size_t w, size_t h,
         assert(inter->empty());
         inter->resize(h);
     }
-    for(size_t y=0; y<h; y++)
-        for(size_t x=0; x<w; x++)
-            if(x+1<w && y+1<h) {
-                size_t idx0=x+w*y;
-                float a=im[idx0], b=im[idx0+1], c=im[idx0+w], d=im[idx0+w+1];
-                float min=a, max=d;
-                if(min>max)
-                    std::swap(min,max);
-                int sb = b<min? -1: b>max? 1: 0;
-                int sc = c<min? -1: c>max? 1: 0;
-                if(sb*sc <= 0)
-                    continue;
-                float v = (a*d-b*c)/(a+d-b-c);
-                LevelLine* line = new LevelLine(v+0.001);
-                Point p((float)x,(float)y);
-                extract(im,w, visit, ptsPixel, p, *line, ll.size(),inter);
-                ll.push_back(line);
-                std::fill(visit.begin(), visit.end(), false);
-            }
+    handle_extrema(im,w,h, ptsPixel, ll, visit, inter);
+    handle_saddles(im,w,h, ptsPixel, ll, visit, inter);
 }

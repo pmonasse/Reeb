@@ -11,8 +11,15 @@
 
 #include "levelLine.h"
 
+// Inherit from this class to apply transform on the fly while drawing.
+struct TransformPoint {
+    virtual ~TransformPoint() {}
+    virtual Point operator()(const Point& p) const { return p; }
+};
+
 template <typename T>
-void draw_curve(const std::vector<Point>& curve, T v, T* im, int w, int h);
+void draw_curve(const std::vector<Point>& curve, T v, T* im, int w, int h,
+                const TransformPoint& t=TransformPoint());
 
 #include "draw_curve.cpp"
 

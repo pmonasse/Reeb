@@ -58,14 +58,15 @@ void draw_line(const Point& p, const Point& q, T v, T* im, int w, int h) {
 
 /// Draw curve in image
 template <typename T>
-void draw_curve(const std::vector<Point>& curve, T v, T* im, int w, int h) {
+void draw_curve(const std::vector<Point>& curve, T v, T* im, int w, int h,
+                const TransformPoint& t) {
     if(curve.empty())
         return;
     Point delta(.5f, .5f);
     std::vector<Point>::const_iterator it=curve.begin();
     Point o = *it++;
     while(it != curve.end()) {
-        draw_line(o+delta, *it+delta, v, im,w,h);
+        draw_line(t(o)+delta, t(*it)+delta, v, im,w,h);
         o = *it++;
     }
 }
