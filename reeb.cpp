@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
     // Extract level lines
     LLTree tree(in, (int)w, (int)h, z-1);
     free(in);
-    std::cout << tree.nodes().size() << " level lines." << std::endl;
+    std::cout << tree.nodes().size() << " level lines:" << std::endl;
 
     // Draw level lines
     TransformZoom t(z);
@@ -109,10 +109,16 @@ int main(int argc, char** argv) {
     color_t* out = new color_t[w*h];
     const color_t palette[4] = {color_t(0,0,0),   color_t(0,0,255),
                                 color_t(0,255,0), color_t(255,0,0)};
+    int stats[4] = {0};
     for(LLTree::iterator it=tree.begin(); it!=tree.end(); ++it) {
+        ++stats[it->ll->type];
         color_t color = palette[it->ll->type];
         draw_curve(it->ll->line,color, out,(int)w,(int)h, t);
     }
+    std::cout <<   "Min: "     << stats[LevelLine::MIN]
+              << ". Max: "     << stats[LevelLine::MAX]
+              << ". Saddles: " << stats[LevelLine::SADDLE]
+              << '.' << std::endl;
 
     // Output image
     if(io_png_write_u8(argv[2], (unsigned char*)out, (int)w, (int)h, 3)!=0){
