@@ -16,8 +16,8 @@ RUN mkdir -p $bin
 WORKDIR $bin
 COPY . .
 RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
-RUN wget https://github.com/pmonasse/bspline_interpolation_c/archive/refs/tags/v1.3.tar.gz && tar xzf v1.3.tar.gz
-RUN cmake -S bspline_interpolation_c-1.3/src -B build2 -DCMAKE_BUILD_TYPE=Release -DEXTRAPOLATE:BOOL=ON && cmake --build build2 && cp build2/bspline $bin
+RUN wget https://github.com/pmonasse/bspline_interpolation_c/archive/refs/heads/master.tar.gz && tar xzf master.tar.gz
+RUN cmake -S bspline_interpolation_c-master/src -B build2 -DCMAKE_BUILD_TYPE=Release -DEXTRAPOLATE:BOOL=ON && cmake --build build2 && cp build2/bspline $bin
 
 # the execution will happen in the folder /workdir/exec
 # it will be created by IPOL
