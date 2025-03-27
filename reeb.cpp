@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * @file bilines.cpp
- * @brief Display bilinear level lines.
+ * @file reeb.cpp
+ * @brief Display bilinear level lines of singular points.
  * 
- * (C) 2019, Pascal Monasse <pascal.monasse@enpc.fr>
+ * (C) 2025, Pascal Monasse <pascal.monasse@enpc.fr>
  */
 
 #include "lltree.h"
@@ -12,7 +12,6 @@
 #include "cmdLine.h"
 #include "io_png.h"
 #include <map>
-#include <cmath>
 
 struct color_t {
     unsigned char r,g,b;

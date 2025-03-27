@@ -1,3 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file saddle.h
+ * @brief A saddle point inside a sample square.
+ * 
+ * (C) 2025 Pascal Monasse <pascal.monasse@enpc.fr>
+ */
+
 #ifndef SADDLE_H
 #define SADDLE_H
 #include <iostream>

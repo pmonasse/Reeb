@@ -1,4 +1,11 @@
-// Find primitive saddle values that are integers.
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file int_saddles.cpp
+ * @brief Find primitive saddle values that are integers.
+ * 
+ * (C) 2025 Pascal Monasse <pascal.monasse@enpc.fr>
+ */
+
 // If a saddle value can be obtained by affine transform  px+q with p,q>0 of all
 // four coefficients from an integer saddle value, it is not primitive.
 

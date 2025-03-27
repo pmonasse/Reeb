@@ -1,4 +1,10 @@
-// Find min delta between saddle values
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file saddle.h
+ * @brief Find min delta between saddle values.
+ * 
+ * (C) 2025 Pascal Monasse <pascal.monasse@enpc.fr>
+ */
 
 #include "saddle.h"
 #include <vector>

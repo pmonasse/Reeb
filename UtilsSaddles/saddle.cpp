@@ -1,3 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file saddle.cpp
+ * @brief A saddle point inside a sample square.
+ * 
+ * (C) 2025 Pascal Monasse <pascal.monasse@enpc.fr>
+ */
+
 #include "saddle.h"
 
 std::ostream& operator<<(std::ostream& str, const Saddle& s) {
