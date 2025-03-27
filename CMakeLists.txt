@@ -38,3 +38,9 @@ target_link_libraries(reeb PRIVATE PNG::PNG)
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU)|(CLANG)")
   set_target_properties(reeb PROPERTIES COMPILE_FLAGS "-Wall -Wextra")
 endif()
+
+# UtilSaddles
+add_executable(int_saddles UtilsSaddles/int_saddles.cpp
+                           UtilsSaddles/saddle.cpp)
+add_executable(delta_saddles UtilsSaddles/delta_saddles.cpp
+                             UtilsSaddles/saddle.cpp)
