@@ -112,7 +112,12 @@ int main(int argc, char** argv) {
     for(LLTree::iterator it=tree.begin(); it!=tree.end(); ++it) {
         ++stats[it->ll->type];
         color_t color = palette[it->ll->type];
-        draw_curve(it->ll->line,color, out,(int)w,(int)h, t);
+        if(it->ll->type == LevelLine::MIN || it->ll->type == LevelLine::MAX) {
+            if(it->parent && it->parent->ll->type==it->ll->type)
+                color = color_t();
+            fill_curve(it->ll->line,color, out,(int)w,(int)h, t);
+        } else
+            draw_curve(it->ll->line,color, out,(int)w,(int)h, t);
     }
     std::cout <<   "Min: "     << stats[LevelLine::MIN]
               << ". Max: "     << stats[LevelLine::MAX]

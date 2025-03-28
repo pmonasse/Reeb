@@ -157,8 +157,7 @@ void fill_inter(T value, T* im, size_t w, size_t h,
 /// Fill interior region of curve.
 template <typename T>
 void fill_curve(const std::vector<Point>& line, T value,
-                T* out, size_t w, size_t h,
-                const TransformPoint& t=TransformPoint()) {
+                T* out, int w, int h, const TransformPoint& t) {
     if(line.empty())
         return;
     PolyIterator p(line,t);
