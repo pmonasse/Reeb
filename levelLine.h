@@ -12,10 +12,13 @@
 #include <vector>
 #include <iostream>
 
+/// Type of point coordinates.
+typedef float pt_t;
+
 struct Point {
-    float x, y;
+    pt_t x, y;
     Point() {}
-    Point(float x0, float y0): x(x0), y(y0) {}
+    Point(pt_t x0, pt_t y0): x(x0), y(y0) {}
     bool operator==(const Point& p) const;
     bool operator!=(const Point& p) const;
 };
@@ -34,23 +37,27 @@ inline Point& operator+=(Point& p1, Point p2) {
     return p1;
 }
 
-void zoom_line(std::vector<Point>& line, float zoom);
+/// Inherit from this class to apply transform on the fly while drawing.
+struct TransformPoint {
+    virtual ~TransformPoint() {}
+    virtual Point operator()(const Point& p) const { return p; }
+};
 
 /// Level line: a level and a polygonal line
 struct LevelLine {
-    float level;
+    pt_t level;
     std::vector<Point> line;
     enum Type { REGULAR=0, MIN, SADDLE, MAX };
     Type type;
-    LevelLine(float l, Type t=REGULAR): level(l), type(t) {}
+    LevelLine(pt_t l, Type t=REGULAR): level(l), type(t) {}
     void fill(unsigned char* data, size_t w, size_t h,
-              std::vector< std::vector<float> >* inter=0) const;
+              std::vector< std::vector<pt_t> >* inter=0) const;
 };
 
 std::ostream& operator<<(std::ostream& str, const LevelLine& line);
 
 /// Abscissa (Inter.first) of intersection of level line of index (Inter.second)
-typedef std::pair<float,size_t> Inter;
+typedef std::pair<pt_t,size_t> Inter;
 
 void extract(const unsigned char* data, size_t w, size_t h,
              int ptsPixel,

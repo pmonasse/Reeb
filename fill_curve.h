@@ -12,9 +12,8 @@
 #include "levelLine.h"
 
 template <typename T>
-void fill_curve(const std::vector<Point>& line, T value,
-                T* data, size_t w, size_t h,
-                std::vector< std::vector<float> >* inter=0);
+void fill_curve(const std::vector<Point>& line, T v, T* im, int w, int h,
+                const TransformPoint& t=TransformPoint());
 
 // Templates must have their implementation nearby
 #include "fill_curve.cpp"

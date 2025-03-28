@@ -13,13 +13,13 @@
 #include <cassert>
 
 /// Quantification steps of singular levels. Safe up to width < 2^10 pixels.
-/// 23 bits for epsilon machine: -8 bits for image depth, -10 bits for width.
-const int QLEVEL = 1<<(23-8-10);
-const float DELTA_LEVEL = 1.0f/QLEVEL;
+/// 23 bits for epsilon machine: -8 bits for image depth, -6 bits for width.
+const int QLEVEL = 1<<(23-8-6);
+const pt_t DELTA_LEVEL = 1.0f/QLEVEL;
 /// Quantized level of saddles.
-float qlevel(float v) {
-    float intpart; // Integral part
-    float frac = std::modf(v, &intpart); // Fract part, quantified next line
+pt_t qlevel(pt_t v) {
+    pt_t intpart; // Integral part
+    pt_t frac = std::modf(v, &intpart); // Fract part, quantified next line
     int s = (int)std::floor(frac*QLEVEL);
     s = std::max(2,std::min(QLEVEL-2,s));
     frac = s*DELTA_LEVEL;
@@ -44,7 +44,7 @@ inline Point operator-(Point p1, Point p2) {
 }
 
 /// Vector multiplication
-inline Point operator*(float f, Point p) {
+inline Point operator*(pt_t f, Point p) {
     return Point(f*p.x, f*p.y);
 }
 
@@ -54,15 +54,6 @@ std::ostream& operator<<(std::ostream& str, const LevelLine& l) {
     for(it=l.line.begin(); it!=l.line.end(); ++it)
         str << it->x << " " << it->y << " ";
     return str;
-}
-
-/// Apply zoom factor to points of \a line.
-void zoom_line(std::vector<Point>& line, float zoom) {
-    std::vector<Point>::iterator it=line.begin(), end=line.end();
-    for(; it!=end; ++it) {
-        it->x *= zoom;
-        it->y *= zoom;
-    }
 }
 
 /// Parameters of a hyperbola.
@@ -79,18 +70,18 @@ void zoom_line(std::vector<Point>& line, float zoom) {
 /// \f[ (x-xs)(y-ys) = \delta. \f]
 class Hyperbola {
 public:
-    float num, denom; /// The saddle value is num/denom
+    int num, denom; /// The saddle value is num/denom
     Point s; ///< Saddle point=center of hyperbola
     Point v; ///< Vertex of hyperbola=point of maximal curvature
-    float delta; ///< Parameter of hyperbola (sqrt(2*delta) = semi major axis)
+    pt_t delta; ///< Parameter of hyperbola (sqrt(2*delta) = semi major axis)
 
-    Hyperbola(const Point& pos, const Point& p, unsigned char lev[4], float l);
+    Hyperbola(const Point& pos, const Point& p, unsigned char lev[4], pt_t l);
     bool valid() const { return (denom!=0); }
     bool vertex_in_dual_pixel(const Point& p) const;
     void sample(const Point& p1, const Point& p2, int ptsPixel,
                 std::vector<Point>& line) const;
 private:
-    static float sign(float f) { return (f>0)? +1: -1; }
+    static int sign(pt_t f) { return (f>0)? +1: -1; }
 };
 
 /// Decompose hyperbola branch.
@@ -101,19 +92,23 @@ private:
 /// The hyperbola can be degenerate (a segment), in which case \c s, \c v and
 /// \c delta make no sense. The method \c valid() must be used to check.
 Hyperbola::Hyperbola(const Point& pos, const Point& p,
-                     unsigned char level[4],float l) {
-    num = level[0]*(float)level[2]-level[1]*(float)level[3];
-    denom = (float)level[0]+level[2]-level[1]-level[3];
+                     unsigned char level[4], pt_t l) {
+    num   =  level[0]*level[2] - level[1]*level[3];
+    denom = (level[0]+level[2])-(level[1]+level[3]);
     delta = 0;
     if(denom == 0)
         return; // Degenerate hyperbola
-    float d = 1.0f/denom;
+    pt_t d = 1.0/denom;
     s.x = pos.x + (level[0]-level[1])*d;
     s.y = pos.y + (level[0]-level[3])*d;
     delta = (denom*l-num)*(d*d);
     d = sqrt(std::abs(delta));
     v.x = s.x + sign(p.x-s.x)*d;
     v.y = s.y + sign(p.y-s.y)*d;
+    if(denom<0) { // Optim for later: transform a<num/denom into a*denom<num
+        num = -num;
+        denom=-denom;
+    }
 }
 
 /// Tell if the vertex of the hyperbola branch is inside the dual pixel of
@@ -136,7 +131,7 @@ void Hyperbola::sample(const Point& p1, const Point& p2, int ptsPixel,
     if(p.y<0) p.y=-p.y;
     if(p.x>p.y) { // Uniform sample along x
         int n = ceil(p.x*ptsPixel);
-        float dx = (p2.x-p1.x)/n;
+        pt_t dx = (p2.x-p1.x)/n;
         p = p1;
         for(int i=1; i<n; i++) {
             p.x += dx;
@@ -145,7 +140,7 @@ void Hyperbola::sample(const Point& p1, const Point& p2, int ptsPixel,
         }
     } else { // Uniform sample along y
         int n = ceil(p.y*ptsPixel);
-        float dy = (p2.y-p1.y)/n;
+        pt_t dy = (p2.y-p1.y)/n;
         p = p1;
         for(int i=1; i<n; i++) {
             p.y += dy;
@@ -165,8 +160,8 @@ void Hyperbola::sample(const Point& p1, const Point& p2, int ptsPixel,
 /// in clockwise order starting from the top left vertex.
 class DualPixel {
 public:
-    DualPixel(Point& p, float l, const unsigned char* im, size_t w);
-    void follow(Point& p, float l, int ptsPixel, std::vector<Point>& line);
+    DualPixel(Point& p, pt_t l, const unsigned char* im, size_t w);
+    void follow(Point& p, pt_t l, int ptsPixel, std::vector<Point>& line);
     bool mark_visit(std::vector<bool>& visit,
                     std::vector< std::vector<Inter> >* inter, size_t idx,
                     const Point& p) const;
@@ -178,11 +173,11 @@ private:
     Dir _d; /// Direction of entry into dual pixel.
 
     void update_levels();
-    Point move(float l, float snum, float sdenom);
+    Point move(pt_t l, int snum, int sdenom);
 };
 
 /// Return x for y=v on line joining (0,v0) and (1,v1).
-inline float linear(float v0, float v, float v1) {
+inline pt_t linear(pt_t v0, pt_t v, pt_t v1) {
     return (v-v0)/(v1-v0);
 }
 
@@ -195,7 +190,7 @@ inline float linear(float v0, float v, float v1) {
 /// crossing the edgel from \a p to \a p+(1,0). It means the starting point of
 /// the level line is at \a p+(x,0), with 0<x<1. As output, \a p is moved to
 /// this position.
-DualPixel::DualPixel(Point& p, float l, const unsigned char* im, size_t w)
+DualPixel::DualPixel(Point& p, pt_t l, const unsigned char* im, size_t w)
 : _im(im), _w(w), _pos(p), _d(S) {
     update_levels();
     if(_level[_d]>l && l>_level[(_d+3)%4]) {
@@ -220,11 +215,11 @@ void DualPixel::update_levels() {
 /// \return subpixel entry point in new dual pixel (=exit point of old one)
 /// Only the saddle level (snum/sdenom) may be used, but most of the time it is
 /// not. Pass two parameters in order not to pay an unnecessary division.
-Point DualPixel::move(float l, float snum, float sdenom) {
+Point DualPixel::move(pt_t l, int snum, int sdenom) {
     bool left  = (l>_level[(_d+2)%4]); // Is there an exit at the left?
     bool right = (l<_level[(_d+1)%4]); // Is there an exit at the right?
     if(left && right) { // Disambiguate saddle point
-        right = (l<snum/sdenom);
+        right = (l*sdenom<snum); // sdenom>0, so equivalent to l<num/denom
         left = !right;
     }
     // update direction
@@ -234,7 +229,7 @@ Point DualPixel::move(float l, float snum, float sdenom) {
     _pos += delta[_d];
     update_levels();
 
-    float coord = linear(_level[_d], l, _level[(_d+3)%4]);
+    pt_t coord = linear(_level[_d], l, _level[(_d+3)%4]);
     Point p = _pos;
     for(Dir d=0; d<_d; d++) p += delta[d];
     p += coord*delta[_d+1]; // Safe: delta[4]==delta[0]
@@ -247,7 +242,7 @@ Point DualPixel::move(float l, float snum, float sdenom) {
 /// \param l level of the level line
 /// \param ptsPixel number of points of discretization per pixel.
 /// \param[out] line intermediate samples stored here.
-void DualPixel::follow(Point& p, float l, int ptsPixel,
+void DualPixel::follow(Point& p, pt_t l, int ptsPixel,
                        std::vector<Point>& line) {
     assert(_level[_d]<l && l<_level[(_d+3)%4]);
     // 1. Compute hyperbola equation
@@ -258,7 +253,7 @@ void DualPixel::follow(Point& p, float l, int ptsPixel,
     p = move(l, h.num, h.denom);
     // 3. Sample hyperbola in previous dual pixel position
     if(h.valid() && ptsPixel>0) { // Do not sample if not hyperbola (straight)
-        if(std::abs(h.delta) < 1.0e-2f) { // Saddle level: one or two segments
+        if(std::abs(h.delta) < 1.0e-2) { // Saddle level: one or two segments
             if(vInside)
                 line.push_back(h.v); // Put vertex only (almost saddle point)
             return;
@@ -329,7 +324,7 @@ static bool find_extremum(const unsigned char* im, size_t w, size_t h,
     unsigned char level=im[x+y*w];
     vu[x+y*w] = true;
     std::stack<Point> S;
-    S.push( Point((float)x,(float)y) );
+    S.push( Point((pt_t)x,(pt_t)y) );
     bool success = true;
     while(! S.empty()) {
         Point p = S.top(); S.pop();
@@ -369,7 +364,7 @@ void handle_extrema(const unsigned char* im, size_t w, size_t h,
             std::vector<Point> V;
             if(! find_extremum(im,w,h, x,y,max, vu, V))
                 continue;
-            float v = (max? level-DELTA_LEVEL: level+DELTA_LEVEL);
+            pt_t v = (max? level-DELTA_LEVEL: level+DELTA_LEVEL);
             for(std::vector<Point>::iterator it=V.begin();
                 it!=V.end(); ++it) {
                 size_t idx2 = (size_t)it->x+(size_t)it->y*w;
@@ -389,8 +384,8 @@ void handle_extrema(const unsigned char* im, size_t w, size_t h,
 /// Structure to record all saddle points inside the image.
 struct Saddle {
     size_t x, y; ///< Top-left corner of sample square
-    float value; ///< Level of saddle
-    Saddle(size_t x0, size_t y0, float v): x(x0), y(y0), value(v) {}
+    pt_t value; ///< Level of saddle
+    Saddle(size_t x0, size_t y0, pt_t v): x(x0), y(y0), value(v) {}
 };
 bool operator<(const Saddle& s1, const Saddle& s2) {
     return s1.value < s2.value;
@@ -398,19 +393,19 @@ bool operator<(const Saddle& s1, const Saddle& s2) {
 
 /// If saddle in unit square of top-left corner (x,y), return its level.
 static bool level_saddle(const unsigned char* im, size_t w, size_t h,
-                         size_t x, size_t y, float& v) {
+                         size_t x, size_t y, pt_t& v) {
     if(x+1>=w || y+1>=h)
         return false;
     size_t idx0=x+w*y;
-    float a=im[idx0], b=im[idx0+1], c=im[idx0+w], d=im[idx0+w+1];
-    float min=a, max=d;
+    unsigned char a=im[idx0], b=im[idx0+1], c=im[idx0+w], d=im[idx0+w+1];
+    unsigned char min=a, max=d;
     if(min>max)
         std::swap(min,max);
     int sb = b<min? -1: b>max? 1: 0;
     int sc = c<min? -1: c>max? 1: 0;
     if(sb*sc <= 0)
         return false;
-    v = (a*d-b*c)/(a+d-b-c);
+    v = (a*d-b*c)/pt_t(a+d-b-c);
     return true;
 }
 
@@ -419,7 +414,7 @@ std::vector<Saddle> find_saddles(const unsigned char* im, size_t w, size_t h) {
     std::vector<Saddle> S;
     for(size_t y=0; y<h; y++)
         for(size_t x=0; x<w; x++) {
-            float v;
+            pt_t v;
             if(level_saddle(im,w,h, x,y, v))
                 S.push_back( Saddle(x,y,v) );
         }
@@ -435,12 +430,12 @@ void handle_saddles(const unsigned char* im, size_t w, size_t h,
     std::vector<Saddle> S = find_saddles(im,w,h);
     std::sort(S.begin(), S.end());
     for(std::vector<Saddle>::const_iterator it=S.begin(); it!=S.end();) {
-        float v = qlevel(it->value); // Handle together all at same quant. level
+        pt_t v = qlevel(it->value); // Handle together all at same quant. level
         for(; it!=S.end() && qlevel(it->value)==v; ++it) {
             for(size_t i=0; i<=1; i++)
                 if(! visit[it->x+(it->y+i)*w]) {
                     LevelLine* line = new LevelLine(v, LevelLine::SADDLE);
-                    Point p((float)it->x,(float)it->y+i);
+                    Point p((pt_t)it->x,(pt_t)it->y+i);
                     extract(im,w, visit, ptsPixel, p, *line, ll.size(), inter);
                     ll.push_back(line);
                 }

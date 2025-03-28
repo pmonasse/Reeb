@@ -9,7 +9,7 @@
 #ifdef DRAW_CURVE_H
 
 /// max(0,min(abs(v),m-1))
-static int clip(float v, int m) {
+static int clip(pt_t v, int m) {
     if(v<0)
         return 0;
     if(v>=m)
@@ -62,7 +62,7 @@ void draw_curve(const std::vector<Point>& curve, T v, T* im, int w, int h,
                 const TransformPoint& t) {
     if(curve.empty())
         return;
-    Point delta(.5f, .5f);
+    Point delta(.5, .5);
     std::vector<Point>::const_iterator it=curve.begin();
     Point o = *it++;
     while(it != curve.end()) {
